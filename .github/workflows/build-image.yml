@@ -1,0 +1,45 @@
+name: Build & publish container image
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'service/**'
+      - '.github/workflows/build-image.yml'
+  workflow_dispatch:
+  release:
+    types: [ published ]
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/wsm-esign-api
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute tags
+        id: tags
+        run: |
+          echo "tags=${IMAGE}:latest,${IMAGE}:v1,${IMAGE}:${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push (linux/amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./service
+          file: ./service/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}

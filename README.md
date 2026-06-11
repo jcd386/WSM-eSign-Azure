@@ -9,6 +9,12 @@ This template pulls a **prebuilt public container image** and exposes a secure H
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fjcd386%2FWSM-eSign-Azure%2Fmain%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fjcd386%2FWSM-eSign-Azure%2Fmain%2FcreateUiDefinition.json)
 [![Visualize](https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/1-CONTRIBUTION-GUIDE/images/visualizebutton.svg)](https://armviz.io/#/?load=https%3A%2F%2Fraw.githubusercontent.com%2Fjcd386%2FWSM-eSign-Azure%2Fmain%2Fazuredeploy.json)
 
+> **Deploying into a specific customer tenant?** If your account is a guest in multiple Azure directories, the button opens whichever directory you used last. Pin the deploy to the right tenant by prefixing the portal URL with the customer's verified domain (or tenant ID):
+>
+> `https://portal.azure.com/<customer-domain.com>#create/Microsoft.Template/uri/...`
+>
+> Or switch first: portal avatar (top right) → **Switch directory** → pick the customer → click Deploy again.
+
 ### 1. Click **Deploy to Azure**
 Sign in, pick a **Subscription** and create (or pick) a **Resource group**. Choose a **Region** near your Salesforce instance. Optionally set a size and an API key (leave the key blank to auto-generate a strong one). Click **Review + create** → **Create**. Provisioning takes ~3–5 minutes.
 

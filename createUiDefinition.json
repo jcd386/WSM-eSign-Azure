@@ -18,14 +18,19 @@
       },
       {
         "name": "apiKey",
-        "type": "Microsoft.Common.TextBox",
-        "label": "API key (optional)",
-        "defaultValue": "",
-        "toolTip": "Shared secret Salesforce will send as the X-API-Key header. Leave blank to auto-generate a strong random key (shown in the deployment outputs).",
+        "type": "Microsoft.Common.PasswordBox",
+        "label": {
+          "password": "API key",
+          "confirmPassword": "Confirm API key"
+        },
+        "toolTip": "Shared secret Salesforce will send as the X-API-Key header. Generate one with: openssl rand -hex 32",
         "constraints": {
-          "required": false,
-          "regex": "^$|^[A-Za-z0-9._-]{16,128}$",
-          "validationMessage": "Leave blank to auto-generate, or provide 16-128 chars (letters, numbers, . _ -)."
+          "required": true,
+          "regex": "^[A-Za-z0-9._-]{16,128}$",
+          "validationMessage": "Provide 16-128 chars (letters, numbers, . _ -)."
+        },
+        "options": {
+          "hideConfirmation": true
         }
       }
     ],
@@ -42,10 +47,22 @@
             "toolTip": "Memory is paired automatically at 2 GiB per vCPU. 1 vCPU / 2 GiB matches the current service.",
             "constraints": {
               "allowedValues": [
-                { "label": "0.5 vCPU / 1 GiB (light)", "value": "0.5" },
-                { "label": "1.0 vCPU / 2 GiB (recommended)", "value": "1.0" },
-                { "label": "1.5 vCPU / 3 GiB", "value": "1.5" },
-                { "label": "2.0 vCPU / 4 GiB (heavy document generation)", "value": "2.0" }
+                {
+                  "label": "0.5 vCPU / 1 GiB (light)",
+                  "value": "0.5"
+                },
+                {
+                  "label": "1.0 vCPU / 2 GiB (recommended)",
+                  "value": "1.0"
+                },
+                {
+                  "label": "1.5 vCPU / 3 GiB",
+                  "value": "1.5"
+                },
+                {
+                  "label": "2.0 vCPU / 4 GiB (heavy document generation)",
+                  "value": "2.0"
+                }
               ],
               "required": true
             }
@@ -58,8 +75,14 @@
             "toolTip": "Always warm keeps one replica running so there is no cold start. Scale to zero is cheapest but the first request after idle waits ~10-30s.",
             "constraints": {
               "allowedValues": [
-                { "label": "Always warm (recommended)", "value": 1 },
-                { "label": "Scale to zero (cheapest)", "value": 0 }
+                {
+                  "label": "Always warm (recommended)",
+                  "value": 1
+                },
+                {
+                  "label": "Scale to zero (cheapest)",
+                  "value": 0
+                }
               ],
               "required": true
             }
@@ -79,7 +102,7 @@
     "outputs": {
       "appName": "[basics('appName')]",
       "location": "[location()]",
-      "esignApiKey": "[if(empty(basics('apiKey')), newGuid(), basics('apiKey'))]",
+      "esignApiKey": "[basics('apiKey')]",
       "cpuCores": "[steps('config').cpuCores]",
       "minReplicas": "[steps('config').warmReplica]",
       "maxReplicas": "[steps('config').maxReplicas]"

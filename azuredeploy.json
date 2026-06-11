@@ -8,42 +8,61 @@
     "appName": {
       "type": "string",
       "defaultValue": "wsm-esign-api",
-      "metadata": { "description": "Name for the Container App and its resources." }
+      "metadata": {
+        "description": "Name for the Container App and its resources."
+      }
     },
     "location": {
       "type": "string",
       "defaultValue": "[resourceGroup().location]",
-      "metadata": { "description": "Azure region. Choose one near your Salesforce instance." }
+      "metadata": {
+        "description": "Azure region. Choose one near your Salesforce instance."
+      }
     },
     "containerImage": {
       "type": "string",
       "defaultValue": "ghcr.io/jcd386/wsm-esign-api:v1",
-      "metadata": { "description": "Public container image to deploy. Leave as default unless you host your own copy." }
+      "metadata": {
+        "description": "Public container image to deploy. Leave as default unless you host your own copy."
+      }
     },
     "esignApiKey": {
       "type": "securestring",
-      "defaultValue": "[newGuid()]",
-      "metadata": { "description": "Shared secret. Salesforce sends this as the X-API-Key header. A random key is generated if left blank; copy it from the deployment outputs." }
+      "minLength": 16,
+      "metadata": {
+        "description": "Shared secret. Salesforce sends this as the X-API-Key header. Generate one with: openssl rand -hex 32"
+      }
     },
     "cpuCores": {
       "type": "string",
       "defaultValue": "1.0",
-      "allowedValues": [ "0.5", "1.0", "1.5", "2.0" ],
-      "metadata": { "description": "vCPU per replica. Memory is paired automatically (2 GiB per vCPU)." }
+      "allowedValues": [
+        "0.5",
+        "1.0",
+        "1.5",
+        "2.0"
+      ],
+      "metadata": {
+        "description": "vCPU per replica. Memory is paired automatically (2 GiB per vCPU)."
+      }
     },
     "minReplicas": {
       "type": "int",
       "defaultValue": 1,
       "minValue": 0,
       "maxValue": 5,
-      "metadata": { "description": "Minimum replicas. 1 = always warm (no cold start, recommended). 0 = scale to zero (cheapest, ~10-30s cold start on first call after idle)." }
+      "metadata": {
+        "description": "Minimum replicas. 1 = always warm (no cold start, recommended). 0 = scale to zero (cheapest, ~10-30s cold start on first call after idle)."
+      }
     },
     "maxReplicas": {
       "type": "int",
       "defaultValue": 5,
       "minValue": 1,
       "maxValue": 30,
-      "metadata": { "description": "Maximum replicas to scale out to under load." }
+      "metadata": {
+        "description": "Maximum replicas to scale out to under load."
+      }
     }
   },
   "variables": {
@@ -63,9 +82,13 @@
       "name": "[variables('lawName')]",
       "location": "[parameters('location')]",
       "properties": {
-        "sku": { "name": "PerGB2018" },
+        "sku": {
+          "name": "PerGB2018"
+        },
         "retentionInDays": 30,
-        "features": { "searchVersion": 1 }
+        "features": {
+          "searchVersion": 1
+        }
       }
     },
     {
@@ -103,10 +126,18 @@
             "targetPort": 8000,
             "transport": "auto",
             "allowInsecure": false,
-            "traffic": [ { "latestRevision": true, "weight": 100 } ]
+            "traffic": [
+              {
+                "latestRevision": true,
+                "weight": 100
+              }
+            ]
           },
           "secrets": [
-            { "name": "esign-api-key", "value": "[parameters('esignApiKey')]" }
+            {
+              "name": "esign-api-key",
+              "value": "[parameters('esignApiKey')]"
+            }
           ]
         },
         "template": {
@@ -119,18 +150,27 @@
                 "memory": "[variables('memoryMap')[parameters('cpuCores')]]"
               },
               "env": [
-                { "name": "ESIGN_API_KEY", "secretRef": "esign-api-key" }
+                {
+                  "name": "ESIGN_API_KEY",
+                  "secretRef": "esign-api-key"
+                }
               ],
               "probes": [
                 {
                   "type": "Liveness",
-                  "httpGet": { "path": "/health", "port": 8000 },
+                  "httpGet": {
+                    "path": "/health",
+                    "port": 8000
+                  },
                   "initialDelaySeconds": 10,
                   "periodSeconds": 30
                 },
                 {
                   "type": "Readiness",
-                  "httpGet": { "path": "/health", "port": 8000 },
+                  "httpGet": {
+                    "path": "/health",
+                    "port": 8000
+                  },
                   "initialDelaySeconds": 5,
                   "periodSeconds": 10
                 }
@@ -143,7 +183,11 @@
             "rules": [
               {
                 "name": "http-scale",
-                "http": { "metadata": { "concurrentRequests": "10" } }
+                "http": {
+                  "metadata": {
+                    "concurrentRequests": "10"
+                  }
+                }
               }
             ]
           }
@@ -159,10 +203,6 @@
     "healthCheckUrl": {
       "type": "string",
       "value": "[concat('https://', reference(resourceId('Microsoft.App/containerApps', parameters('appName')), '2024-03-01').configuration.ingress.fqdn, '/health')]"
-    },
-    "apiKey": {
-      "type": "string",
-      "value": "[parameters('esignApiKey')]"
     },
     "salesforceNamedCredentialUrl": {
       "type": "string",

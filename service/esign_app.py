@@ -990,6 +990,18 @@ async def generate_documents(request: Request):
     from pathlib import Path
     from lxml import etree as ET
 
+    # Optional per-request Microsoft Graph config for DOCX->PDF conversion.
+    # Salesforce's Named Credential injects these as headers (the platform
+    # populates them from the External Credential; Apex never sees the secret).
+    # Each key falls back to the env var, so env-configured deployments and
+    # Modal are unchanged when the headers are absent.
+    ms_config = {
+        "tenant": request.headers.get("X-MS-Tenant-Id") or os.environ.get("MS_TENANT_ID"),
+        "client": request.headers.get("X-MS-Client-Id") or os.environ.get("MS_CLIENT_ID"),
+        "secret": request.headers.get("X-MS-Client-Secret") or os.environ.get("MS_CLIENT_SECRET"),
+        "user": request.headers.get("X-MS-User-Id") or os.environ.get("MS_USER_ID"),
+    }
+
     template_files_meta = body.get("template_files", [])
     merge_data = body.get("merge_data", {})
     source_record_id = body.get("source_record_id")
@@ -1016,7 +1028,7 @@ async def generate_documents(request: Request):
 
     def convert_to_pdf(input_path, tmpdir):
         ext = str(input_path).rsplit(".", 1)[-1].lower()
-        if ext in ("docx", "doc") and os.environ.get("MS_CLIENT_ID"):
+        if ext in ("docx", "doc") and ms_config.get("client"):
             try:
                 return _convert_via_graph(input_path)
             except Exception as graph_err:
@@ -1032,10 +1044,12 @@ async def generate_documents(request: Request):
             return f.read()
 
     def _convert_via_graph(input_path):
-        ms_tenant = os.environ["MS_TENANT_ID"]
-        ms_client = os.environ["MS_CLIENT_ID"]
-        ms_secret = os.environ["MS_CLIENT_SECRET"]
-        ms_user = os.environ["MS_USER_ID"]
+        ms_tenant = ms_config.get("tenant")
+        ms_client = ms_config.get("client")
+        ms_secret = ms_config.get("secret")
+        ms_user = ms_config.get("user")
+        if not all([ms_tenant, ms_client, ms_secret, ms_user]):
+            raise Exception("Incomplete Microsoft Graph config (need tenant, client, secret, user)")
 
         token_resp = http_requests.post(
             f"https://login.microsoftonline.com/{ms_tenant}/oauth2/v2.0/token",

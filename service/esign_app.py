@@ -40,9 +40,15 @@ def _verify_api_key(request: Request):
         return
     provided = request.headers.get("X-API-Key", "") or request.headers.get("Esign-Api-Key", "")
     if not provided:
-        # Log all headers to debug what Salesforce sends
-        all_headers = {k: v[:20] + '...' if len(v) > 20 else v for k, v in request.headers.items()}
-        logger.warning("API key not found in headers. Received headers: %s", all_headers)
+        # Diagnostic: which headers arrived (names only for sensitive ones —
+        # never log auth/secret/key values, even truncated).
+        _SENSITIVE = ("key", "secret", "authorization", "token", "x-ms-")
+        safe_headers = {
+            k: ("[redacted]" if any(s in k.lower() for s in _SENSITIVE)
+                else (v[:20] + '...' if len(v) > 20 else v))
+            for k, v in request.headers.items()
+        }
+        logger.warning("API key not found in headers. Received headers: %s", safe_headers)
     if not provided or not hmac.compare_digest(provided, API_KEY):
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 

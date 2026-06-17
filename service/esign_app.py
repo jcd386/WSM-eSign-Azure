@@ -744,10 +744,11 @@ def _sf_helpers(instance_url, access_token, api_version="63.0"):
             raise Exception(f"File download failed (HTTP {resp.status_code})")
         return resp.content
 
-    def create_content_version(file_bytes, filename, parent_id):
+    def create_content_version(file_bytes, filename, parent_id, mime_type="application/pdf"):
         import json as _json
+        import os as _os
         entity = {
-            "Title": filename.replace(".pdf", ""),
+            "Title": _os.path.splitext(filename)[0],
             "PathOnClient": filename,
             "FirstPublishLocationId": parent_id,
         }
@@ -756,7 +757,7 @@ def _sf_helpers(instance_url, access_token, api_version="63.0"):
             headers=auth_headers,
             files={
                 "entity_content": (None, _json.dumps(entity), "application/json"),
-                "VersionData": (filename, file_bytes, "application/pdf"),
+                "VersionData": (filename, file_bytes, mime_type),
             },
             timeout=120,
         )
@@ -1305,6 +1306,38 @@ async def generate_documents(request: Request):
         doc.close()
         return output.getvalue()
 
+    def process_excel_template(xlsx_bytes, merge_data_inner, file_tmpdir):
+        # Render an .xlsx template against merge_data with xltpl (Jinja2 row/column
+        # expansion + format preservation). ChainableUndefined matches the Word path:
+        # missing merge fields render blank instead of raising. Returns native xlsx bytes.
+        import jinja2
+        import openpyxl
+        from xltpl.writerx import BookWriter
+
+        work_dir = Path(file_tmpdir) / "excel_work"
+        work_dir.mkdir(exist_ok=True)
+        input_path = work_dir / "template.xlsx"
+        with open(input_path, "wb") as f:
+            f.write(xlsx_bytes)
+
+        # Source sheet names must be read before BookWriter loads (it moves the
+        # template sheets into its own resource map; writer.workbook is the empty
+        # output book). Render each source sheet to a same-named output sheet.
+        sheet_names = openpyxl.load_workbook(input_path, read_only=True).sheetnames
+
+        writer = BookWriter(str(input_path))
+        writer.jinja_env.undefined = jinja2.ChainableUndefined  # missing vars -> blank (Word parity)
+        writer.jinja_env.globals.update(merge_data_inner)
+
+        # The payload doubles as routing (tpl_name/sheet_name) and the render context.
+        payloads = [dict(merge_data_inner, tpl_name=n, sheet_name=n) for n in sheet_names]
+        writer.render_book(payloads=payloads)
+
+        rendered_path = work_dir / "rendered.xlsx"
+        writer.save(str(rendered_path))
+        with open(rendered_path, "rb") as f:
+            return f.read()
+
     # Main processing
     template_files = []
     for fm in template_files_meta:
@@ -1344,6 +1377,28 @@ async def generate_documents(request: Request):
                         file_tmpdir = os.path.join(tmpdir, f"pdf_{idx}")
                         os.makedirs(file_tmpdir, exist_ok=True)
                         pdf_bytes = process_pdf_template(pdf_bytes, tags_json, merge_data, file_tmpdir)
+                elif file_type == "Excel":
+                    # Native .xlsx output (generation only — not a signing format,
+                    # and never folded into a merge_into_one combined PDF).
+                    content_doc_id = tf.get("Content_Document_Id__c")
+                    if not content_doc_id:
+                        generated_files.append({"template_file_id": template_file_id, "error": "No .xlsx file"})
+                        continue
+                    xlsx_template_bytes = sf_fetch_file(content_doc_id)
+                    file_tmpdir = os.path.join(tmpdir, f"excel_{idx}")
+                    os.makedirs(file_tmpdir, exist_ok=True)
+                    xlsx_bytes = process_excel_template(xlsx_template_bytes, merge_data, file_tmpdir)
+                    cv_id, content_doc_id = sf_create_cv(
+                        xlsx_bytes, f"{name}.xlsx", source_record_id,
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    generated_files.append({
+                        "template_file_id": template_file_id,
+                        "content_version_id": cv_id,
+                        "content_document_id": content_doc_id,
+                    })
+                    logger.info("Processed %s (Excel) → CV %s", name, cv_id)
+                    continue
                 else:
                     content_doc_id = tf.get("Content_Document_Id__c")
                     if not content_doc_id:

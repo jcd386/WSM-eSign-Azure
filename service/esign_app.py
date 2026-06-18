@@ -998,15 +998,15 @@ async def generate_documents(request: Request):
     from lxml import etree as ET
 
     # Optional per-request Microsoft Graph config for DOCX->PDF conversion.
-    # Salesforce's Named Credential injects these as headers (the platform
-    # populates them from the External Credential; Apex never sees the secret).
-    # Each key falls back to the env var, so env-configured deployments and
-    # Modal are unchanged when the headers are absent.
+    # Salesforce merges these into the request body from the External Credential
+    # principal (same mechanism as sf_client_id/sf_client_secret) — never as
+    # custom headers. Each key falls back to its env var, so env-configured
+    # deployments stay unchanged when the body keys are absent.
     ms_config = {
-        "tenant": request.headers.get("X-MS-Tenant-Id") or os.environ.get("MS_TENANT_ID"),
-        "client": request.headers.get("X-MS-Client-Id") or os.environ.get("MS_CLIENT_ID"),
-        "secret": request.headers.get("X-MS-Client-Secret") or os.environ.get("MS_CLIENT_SECRET"),
-        "user": request.headers.get("X-MS-User-Id") or os.environ.get("MS_USER_ID"),
+        "tenant": body.get("ms_tenant_id") or os.environ.get("MS_TENANT_ID"),
+        "client": body.get("ms_client_id") or os.environ.get("MS_CLIENT_ID"),
+        "secret": body.get("ms_client_secret") or os.environ.get("MS_CLIENT_SECRET"),
+        "user": body.get("ms_user_id") or os.environ.get("MS_USER_ID"),
     }
 
     template_files_meta = body.get("template_files", [])
